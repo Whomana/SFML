@@ -14,20 +14,12 @@ int main() {
     Game game;
 
     while (game.getWindowIsOpen()) {
-
-        //Movement
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) {
-            player.move(sf::Vector2f(-10.0f,0.0f));
-        } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) {
-            player.move(sf::Vector2f(0.0f,-10.0f));
-        } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) {
-            player.move(sf::Vector2f(0.0f,10.0f));
-        } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)){
-            player.move(sf::Vector2f(10.0f,0.0f));
-        }
+        /*
         */
-
+        //Update Game
         game.update();
+        //game.initPlayer();
+        //Render Game
         game.render();
     }
 }
