@@ -10,6 +10,8 @@
 #define YVEL 10.f
 #define JVEL 20.f
 
+#define ENEMYSPEEDUP 5
+
 #define WINDOWW 0
 #define WINDOWH 1
 /*
@@ -18,7 +20,7 @@
  */
 class Game {
 private:
-
+  //Variables
   //Window
   sf::RenderWindow* window_;
   sf::VideoMode videoMode_;
@@ -26,7 +28,8 @@ private:
   //Event
   std::optional<sf::Event> event_;
   //Game Logic
-
+  sf::Clock clock;
+  sf::Time moveIntervalEnemy;
   //Game Objects
   //Player
   sf::RectangleShape player;
@@ -39,9 +42,22 @@ private:
   sf::RectangleShape enemy;
   sf::Vector2f enemyPos;
   sf::Vector2f enemySize;
+  sf::Vector2f enemyOrigin;
   uint8_t numberEnemies;
+  int8_t dir; //move direction
+  int8_t dirCheck;
+  int8_t stepsToSpeedup;
+  const int8_t stepsToSpeedupOld;
+  float enemySpeedUp;
 
-  //Variables
+  //Obstacles
+  sf::RectangleShape obs;
+  sf::Vector2f obsSize;
+  sf::Vector2f obsOrigin;
+  sf::Vector2f obsInitPos;
+  std::vector<sf::RectangleShape> obsPosition;
+  float obsSpacing;
+  uint8_t obsCount;
 
 
   //Private Functions
@@ -57,9 +73,15 @@ public:
   //Functions
   void playerInput();
   void initPlayer();
+  void shoot();
 
   void spawnEnemy();
   void initEnemy(sf::Vector2f enemyPos);
+  void moveEnemies();
+
+  auto initObstacles(sf::Vector2f obsPos) -> void;
+  void spawnObstacle();
+  void renderObstacles();
 
   void pollEvents();
   void update();
