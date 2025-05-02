@@ -10,7 +10,7 @@
 #define YVEL 10.f
 #define JVEL 20.f
 
-#define ENEMYSPEEDUP 5
+#define ENEMYSPEEDUP 3
 
 #define WINDOWW 0
 #define WINDOWH 1
@@ -30,13 +30,22 @@ private:
   //Game Logic
   sf::Clock clock;
   sf::Time moveIntervalEnemy;
+  int8_t enemyMoveCounter;
+  int8_t enemySteps;
   //Game Objects
   //Player
   sf::RectangleShape player;
   sf::Vector2f playerSize;
   sf::Vector2f playerOrigin;
   sf::Vector2f playerPos;
+  bool onKeyPressed;
 
+  t sf::RectangleShape bullet;
+  sf::Vector2f bulletPos;
+  sf::Vector2f bulletSize;
+  sf::Vector2f bulletOrigin;
+  sf::Vector2f bulletSpeed;
+  std::vector<sf::RectangleShape> bullets;
   //Enemies
   std::vector<sf::RectangleShape> enemies;
   sf::RectangleShape enemy;
@@ -52,12 +61,13 @@ private:
 
   //Obstacles
   sf::RectangleShape obs;
+  std::vector<sf::RectangleShape> obsPosition;
   sf::Vector2f obsSize;
   sf::Vector2f obsOrigin;
   sf::Vector2f obsInitPos;
-  std::vector<sf::RectangleShape> obsPosition;
-  float obsSpacing;
+  uint8_t obsPartNum;
   uint8_t obsCount;
+  sf::Vector2f obsSpacing;
 
 
   //Private Functions
@@ -73,7 +83,10 @@ public:
   //Functions
   void playerInput();
   void initPlayer();
+  void initBullet();
   void shoot();
+  void bulletRender();
+  void moveBullet();
 
   void spawnEnemy();
   void initEnemy(sf::Vector2f enemyPos);
@@ -82,6 +95,8 @@ public:
   auto initObstacles(sf::Vector2f obsPos) -> void;
   void spawnObstacle();
   void renderObstacles();
+
+  void collisionDetect();
 
   void pollEvents();
   void update();

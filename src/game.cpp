@@ -7,6 +7,9 @@
 #include "Game.h"
 #include "SFML/Audio/Listener.hpp"
 #include <iostream>
+
+
+
 //Private functions
 void Game::initVar() {
   //Window
@@ -19,15 +22,24 @@ void Game::initVar() {
   //Player
   this->playerSize.x = 100.f;
   this->playerSize.y = 20.f;
-  this->playerOrigin.x = playerSize.x / 2;
-  this->playerOrigin.y = playerSize.y / 2;
+  this->playerOrigin.x = playerSize.x / 2.f;
+  this->playerOrigin.y = playerSize.y / 2.f;
   this->playerPos.x = static_cast<float>(windowSize[WINDOWW]) / 2.f;
   this->playerPos.y = static_cast<float>(windowSize[WINDOWH]) - (static_cast<float>(windowSize[WINDOWH] / 4.f));
+  this->onKeyPressed = false;
+  //Bullets
+  this->bulletSize.x = 10.f;
+  this->bulletSize.y = 40.f;
+  this->bulletOrigin.x = this->bulletSize.x / 2.f;
+  this->bulletOrigin.y = this->bulletSize.y;
+  this->bulletSpeed.x = 0.f;
+  this->bulletSpeed.y = -10.f;
+
   //Enemies
   this->enemySize.x = 40.f;
   this->enemySize.y = 40.f;
-  this->enemyOrigin.x = enemySize.x / 2;
-  this->enemyOrigin.y = enemySize.y / 2;
+  this->enemyOrigin.x = enemySize.x / 2.f;
+  this->enemyOrigin.y = enemySize.y / 2.f;
   this->numberEnemies = 24;
   this->enemyPos.x = 100.f;
   this->enemyPos.y = 200.f;
@@ -35,40 +47,61 @@ void Game::initVar() {
   this->dirCheck = -1;
   this->stepsToSpeedup = 0;
   this->enemySpeedUp = 5;
+  this->enemySteps = 6;
+  this->enemyMoveCounter = enemySteps;
   //Obstacles
-  this->obsSize.x = 100.f;
-  this->obsSize.y = 100.f;
-  this->obsOrigin.x = obsSize.x / 2;
-  this->obsOrigin.y = obsSize.y / 2;
+  this->obsSize.x = 30.f;
+  this->obsSize.y = 30.f;
+  this->obsOrigin.x = obsSize.x / 2.f;
+  this->obsOrigin.y = obsSize.y / 2.f;
   this->obsCount = 4;
-  this->obsInitPos.x = windowSize[WINDOWW] / 8 + 50;
-  this->obsInitPos.y = (windowSize[WINDOWH] / 3) * 2;
-  this->obsSpacing = (windowSize[WINDOWW] - obsInitPos.x) / obsCount;
-
-
+  this->obsInitPos.x = (static_cast<float>(windowSize[WINDOWW]) / 8.f + 50.f);
+  this->obsInitPos.y = ((static_cast<float>(windowSize[WINDOWH]) / 3.f) * 2.f);
+  this->obsSpacing.x = ((static_cast<float>(windowSize[WINDOWW]) - obsInitPos.x) / static_cast<float>(obsCount));
+  this->obsSpacing.y = obsInitPos.y;
 }
 
-
-void Game::initObstacles(const sf::Vector2f obsPos) {
-  this->obs.setSize(obsSize);
-  this->obs.setOrigin(obsOrigin);
-  this->obs.setFillColor(sf::Color::White);
-  this->obs.setPosition(obsPos);
+void Game::initObstacles(sf::Vector2f obsPos) {
+  /*
+   *@return void
+   *creates a 3X3 grid of rectangles around a certain position
+   *obsInitPos Position around which Obstacle is built
+   *newPos Position of Obstacle Parts
+   *obsSize Obstacle parts Size
+   *obsOrigin Origin of obstacle parts (center)
+  */
+  //Get position of top left square
+  sf::Vector2f newPos(obsPos.x - this->obsSize.x, obsPos.y - this->obsSize.y);
+  //Build Obstacle of 3X3 parts
+  for (int i = 0; i < 3 ; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      this->obs.setSize(obsSize);
+      this->obs.setOrigin(obsOrigin);
+      this->obs.setFillColor(sf::Color::White);
+      this->obs.setPosition(sf::Vector2f(newPos.x, newPos.y));
+      this->obsPosition.push_back(obs);
+      newPos.x += obsSize.x;
+    }
+    newPos.x  = obsPos.x - this->obsSize.x;
+    newPos.y += this->obsSize.y;
+  }
 }
 
 void Game::spawnObstacle() {
   /*
    *  @return void
+   *  creates obsCount many Obstacles
    *  obsCount Number Obstacles
-   *  ObsPosition stores Obstacles
+   *  newPos changed center position of Obstacles
    *  ObsInitPos initial position of Obstacles
    *  obsSpacing Space between Obstacles
    */
+
+  sf::Vector2f newPos(obsInitPos);
   for (int i = 0; i < obsCount; i++) {
-    this->initObstacles(obsInitPos);
-    this->obsPosition.push_back(this->obs);
-    this->obsInitPos.x += this->obsSpacing;
-    std::cout << this->obs.getPosition().x << std::endl;
+    this->initObstacles(newPos);
+    newPos.x += obsSpacing.x;
+    std::cout << newPos.x << std::endl;
   }
 }
 
@@ -79,13 +112,31 @@ void Game::renderObstacles() {
   }
 }
 
+void Game::collisionDetect() {
+  int j = 0;
+  int i = 0;
+  for (auto &e: enemies) {
+    for (auto &b: bullets) {
+      if (e.getGlobalBounds().contains(b.getPosition() - sf::Vector2f(0.f, b.getSize().y))) {
+        this->enemies.erase(this->enemies.begin() + i);
+        this->bullets.erase(this->bullets.begin() + j);
+      } else if (this->obsPosition[i].getGlobalBounds().contains(b.getPosition() - sf::Vector2f(0.f, b.getSize().y))) {
+        this->bullets.erase(this->bullets.begin() + j);
+      }
+      if (b.getPosition().y - b.getSize().y == 0) {
+        this->bullets.erase(this->bullets.begin() + j);
+      }
+      j++;
+    }
+    i++;
+  }
+}
 
 void Game::initWindow() {
   this->videoMode_.size.x = windowSize[WINDOWW];
   this->videoMode_.size.y = windowSize[WINDOWH];
   this->window_ = new sf::RenderWindow(videoMode_, "Funktioniert", sf::Style::Close | sf::Style::Titlebar);
   this->window_->setFramerateLimit(60);
-  std::cout << this->window_->getSize().x;
 }
 
 void Game::initPlayer() {
@@ -94,6 +145,31 @@ void Game::initPlayer() {
   this->player.setFillColor(sf::Color::White);
   this->player.setOutlineThickness(10.0f);
   this->player.setPosition(sf::Vector2f(playerPos));
+}
+
+void Game::initBullet() {
+  this->bullet.setSize(bulletSize);
+  this->bullet.setPosition(this->player.getPosition());
+  this->bullet.setOrigin(bulletOrigin);
+  this->bullet.setFillColor(sf::Color::White);
+
+}
+
+void Game::shoot() {
+  this->initBullet();
+  this->bullets.push_back(this->bullet);
+}
+
+void Game::bulletRender() {
+  for (auto& e: bullets) {
+    this->window_->draw(e);
+  }
+}
+
+void Game::moveBullet() {
+  for (auto &e: bullets) {
+    e.move(bulletSpeed);
+  }
 }
 
 void Game::initEnemy(const sf::Vector2f enemyPos) {
@@ -120,13 +196,13 @@ void Game::moveEnemies() {
   //Check for time to move
   if (this->clock.getElapsedTime().asMicroseconds() >= this->moveIntervalEnemy.asMicroseconds()) {
     clock.restart();
-    //Move down and update direction
-    if ((this->enemies[5].getPosition().x + this->enemies[5].getSize().x >= static_cast<float>(window_->getSize().x) || this->enemies[0].getPosition().x - this->enemies[0].getSize().x <= 0.f) && this->dir == this->dirCheck) {
+    if (this->enemyMoveCounter == 0 && this->dir == this->dirCheck) {
+    //Move Down
       for (auto &e: enemies) {
         e.setPosition(sf::Vector2f(e.getPosition().x, e.getPosition().y + enemySpeedUp));
       }
       this->stepsToSpeedup++;
-
+      this->enemyMoveCounter = this->enemySteps;
       this->dir *= (-1);
     } else {
       //Move sideways
@@ -134,13 +210,13 @@ void Game::moveEnemies() {
         e.setPosition(sf::Vector2f(e.getPosition().x + this->enemySpeedUp * static_cast<float>(this->dir), e.getPosition().y));
       }
       this->stepsToSpeedup++;
-      if (this->enemies[5].getPosition().x + this->enemies[5].getSize().x >= static_cast<float>(window_->getSize().x) || this->enemies[0].getPosition().x - this->enemies[0].getSize().x <= 0.f) {
+      this->enemyMoveCounter--;
+      if (this->enemyMoveCounter == 0) {
         this->dirCheck = this->dir;
       }
     }
   }
 }
-
 
 void Game::spawnEnemy() {
   /*
@@ -173,6 +249,12 @@ void Game::playerInput() {
   } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) {
     this->player.move(sf::Vector2f(XVEL,0.0f));
   }
+  if ( sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space) && !onKeyPressed) {
+    this->shoot();
+    this->onKeyPressed = true;
+  } else if (!(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))) {
+    this->onKeyPressed = false;
+  }
   if (this->player.getPosition().x >= static_cast<float>(windowSize[WINDOWW]) - player.getSize().x / 2.f) {
     this->player.setPosition(sf::Vector2f(static_cast<float>(windowSize[WINDOWW]) - player.getSize().x / 2.f, player.getPosition().y));
   } else if (this->player.getPosition().x <= player.getSize().x / 2.f) {
@@ -194,7 +276,6 @@ void Game::pollEvents() {
   }
 }
 
-
 Game::~Game() {
   delete this->window_;
 }
@@ -207,13 +288,17 @@ Game::Game() : stepsToSpeedupOld(ENEMYSPEEDUP) {
   this->initEnemy(enemyPos);
   this->updateEnemies();
   this->initObstacles(obsInitPos);
+  this->initBullet();
   this->spawnObstacle();
+  //this->initObstacles(this->obsInitPos);
 }
 
 void Game::update() {
   this->pollEvents();
   this->playerInput();
   this->moveEnemies();
+  this->moveBullet();
+  this->collisionDetect();
 }
 
 void Game::updateEnemies() {
@@ -238,6 +323,7 @@ void Game::render() {
 
 
   this->renderPlayer();
+  this->bulletRender();
   this->renderEnemies();
   this->renderObstacles();
 
