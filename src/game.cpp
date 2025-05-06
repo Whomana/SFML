@@ -2,13 +2,9 @@
 // Created by Alp on 15.04.2025.
 //
 
+
 #include <algorithm>
-
 #include "Game.h"
-#include "SFML/Audio/Listener.hpp"
-#include <iostream>
-
-
 
 //Private functions
 void Game::initVar() {
@@ -17,15 +13,23 @@ void Game::initVar() {
   this->windowSize[WINDOWW] = 800;
   this->windowSize[WINDOWH] = 1080;
   //GameLogic
+  this->globalClock;
+  this->gameSpeedUp = sf::seconds(10.f);
+  this->gameSpeedUpStep = 1.f;
+  this->moveIntervalEnemyStep = 250.f;
+  this->gameSpeed = sf::milliseconds(2000.f);
+  this->gameSpeedStep = 150.f;
   this->clock;
-  this->moveIntervalEnemy = sf::seconds(2.f);
+  this->moveIntervalEnemy = sf::milliseconds(2000.f);
+  this->enemyClock;
+  std::srand(std::time(nullptr));
   //Player
   this->playerSize.x = 100.f;
   this->playerSize.y = 20.f;
   this->playerOrigin.x = playerSize.x / 2.f;
   this->playerOrigin.y = playerSize.y / 2.f;
   this->playerPos.x = static_cast<float>(windowSize[WINDOWW]) / 2.f;
-  this->playerPos.y = static_cast<float>(windowSize[WINDOWH]) - (static_cast<float>(windowSize[WINDOWH] / 4.f));
+  this->playerPos.y = static_cast<float>(windowSize[WINDOWH]) - (static_cast<float>(windowSize[WINDOWH]) / 4.f);
   this->onKeyPressed = false;
   //Bullets
   this->bulletSize.x = 10.f;
@@ -34,7 +38,7 @@ void Game::initVar() {
   this->bulletOrigin.y = this->bulletSize.y;
   this->bulletSpeed.x = 0.f;
   this->bulletSpeed.y = -10.f;
-
+  this->bulletExist = true;
   //Enemies
   this->enemySize.x = 40.f;
   this->enemySize.y = 40.f;
@@ -45,10 +49,14 @@ void Game::initVar() {
   this->enemyPos.y = 200.f;
   this->dir = 1;
   this->dirCheck = -1;
-  this->stepsToSpeedup = 0;
   this->enemySpeedUp = 5;
   this->enemySteps = 6;
   this->enemyMoveCounter = enemySteps;
+
+  this->enemyBulletSize.x = this->bulletSize.x;
+  this->enemyBulletSize.y = this->bulletSize.y;
+  this->enemyBulletOrigin.x = this->enemyBulletSize.x / 2;
+  this->enemyBulletOrigin.y = this->enemyBulletSize.y;
   //Obstacles
   this->obsSize.x = 30.f;
   this->obsSize.y = 30.f;
@@ -61,7 +69,7 @@ void Game::initVar() {
   this->obsSpacing.y = obsInitPos.y;
 }
 
-void Game::initObstacles(sf::Vector2f obsPos) {
+void Game::initObstacles(const sf::Vector2f obsPos) {
   /*
    *@return void
    *creates a 3X3 grid of rectangles around a certain position
@@ -98,40 +106,64 @@ void Game::spawnObstacle() {
    */
 
   sf::Vector2f newPos(obsInitPos);
-  for (int i = 0; i < obsCount; i++) {
+  for (int i = 0; i < obsCount; ++i) {
     this->initObstacles(newPos);
     newPos.x += obsSpacing.x;
-    std::cout << newPos.x << std::endl;
   }
 }
 
 void Game::renderObstacles() {
   for (auto &e: this->obsPosition) {
     this->window_->draw(e);
+  }
+}
 
+void Game::enemyCollisionDetection() {
+  for (int i = static_cast<int>(enemyBullets.size()) - 1; i >= 0; --i) {
+    //Collision with player
+    if (this->player.getGlobalBounds().contains(this->enemyBullets[i].getPosition()) && this->enemyBullets[i].getPosition().y == static_cast<float>(windowSize[WINDOWH])) {
+      this->enemyBullets.erase(this->enemyBullets.begin() + i);
+    }
+      //Collision with Obstacles
+    for (int j = static_cast<int>(this->obsPosition.size()) - 1; j >= 0; --j) {
+      if (this->obsPosition[j].getGlobalBounds().contains(this->enemyBullets[i].getPosition() )) {
+        this->obsPosition.erase(this->obsPosition.begin() + j);
+        this->enemyBullets.erase(this->enemyBullets.begin() + i);
+        return;
+      }
+    }
   }
 }
 
 void Game::collisionDetect() {
-  int j = 0;
-  int i = 0;
-  for (auto &e: enemies) {
-    for (auto &b: bullets) {
-      if (e.getGlobalBounds().contains(b.getPosition() - sf::Vector2f(0.f, b.getSize().y))) {
+  /*
+   * @return
+   */
+  //check collision with enemies
+  if (this->bullet){
+    for (int i = static_cast<int>(this->enemies.size()) - 1; i >= 0; --i) {
+      if (this->enemies[i].getGlobalBounds().contains(this->bullet->getPosition() - sf::Vector2f(0.f, this->bullet->getSize().y))) {
         this->enemies.erase(this->enemies.begin() + i);
-        this->bullets.erase(this->bullets.begin() + j);
-      } else if (this->obsPosition[i].getGlobalBounds().contains(b.getPosition() - sf::Vector2f(0.f, b.getSize().y))) {
-        this->bullets.erase(this->bullets.begin() + j);
+        this->bullet.reset();
+        this->bulletExist = true;
+        return;
       }
-      if (b.getPosition().y - b.getSize().y == 0) {
-        this->bullets.erase(this->bullets.begin() + j);
-      }
-      j++;
     }
-    i++;
+    //check collision Obstacles
+    for (int i = static_cast<int>(this->obsPosition.size()) - 1; i >= 0; --i) {
+      if (this->obsPosition[i].getGlobalBounds().contains(this->bullet->getPosition() - sf::Vector2f(0.f, this->bullet->getSize().y))) {
+        this->obsPosition.erase(this->obsPosition.begin() + i);
+        this->bullet.reset();
+        this->bulletExist = true;
+        return;
+      }
+    }
+    if (this->bullet->getPosition().y - this->bullet->getSize().y == 0) {
+      this->bullet.reset();
+      this->bulletExist = true;
+    }
   }
 }
-
 void Game::initWindow() {
   this->videoMode_.size.x = windowSize[WINDOWW];
   this->videoMode_.size.y = windowSize[WINDOWH];
@@ -148,27 +180,26 @@ void Game::initPlayer() {
 }
 
 void Game::initBullet() {
-  this->bullet.setSize(bulletSize);
-  this->bullet.setPosition(this->player.getPosition());
-  this->bullet.setOrigin(bulletOrigin);
-  this->bullet.setFillColor(sf::Color::White);
-
+  this->bullet = std::make_unique<sf::RectangleShape>();
+  this->bullet->setSize(bulletSize);
+  this->bullet->setPosition(this->player.getPosition());
+  this->bullet->setOrigin(bulletOrigin);
+  this->bullet->setFillColor(sf::Color::White);
 }
 
 void Game::shoot() {
   this->initBullet();
-  this->bullets.push_back(this->bullet);
 }
 
-void Game::bulletRender() {
-  for (auto& e: bullets) {
-    this->window_->draw(e);
+void Game::bulletRender() const {
+  if (this->bullet) {
+    this->window_->draw(*this->bullet);
   }
 }
 
-void Game::moveBullet() {
-  for (auto &e: bullets) {
-    e.move(bulletSpeed);
+void Game::moveBullet() const {
+  if (this->bullet) {
+    this->bullet->move(bulletSpeed);
   }
 }
 
@@ -189,10 +220,6 @@ void Game::moveEnemies() {
    * dir direction to move on x-axis
    * moveIntervalEnemy time Interval till next move of enemy
    */
-  if (this->stepsToSpeedup == this->stepsToSpeedupOld && this->moveIntervalEnemy > sf::Time::Zero) {
-    this->moveIntervalEnemy -= sf::seconds(0.38f);
-    this->stepsToSpeedup = 0;
-  }
   //Check for time to move
   if (this->clock.getElapsedTime().asMicroseconds() >= this->moveIntervalEnemy.asMicroseconds()) {
     clock.restart();
@@ -201,7 +228,6 @@ void Game::moveEnemies() {
       for (auto &e: enemies) {
         e.setPosition(sf::Vector2f(e.getPosition().x, e.getPosition().y + enemySpeedUp));
       }
-      this->stepsToSpeedup++;
       this->enemyMoveCounter = this->enemySteps;
       this->dir *= (-1);
     } else {
@@ -209,12 +235,32 @@ void Game::moveEnemies() {
       for (auto &e : enemies) {
         e.setPosition(sf::Vector2f(e.getPosition().x + this->enemySpeedUp * static_cast<float>(this->dir), e.getPosition().y));
       }
-      this->stepsToSpeedup++;
       this->enemyMoveCounter--;
       if (this->enemyMoveCounter == 0) {
         this->dirCheck = this->dir;
       }
     }
+  }
+}
+
+void Game::initEnemyAttack(const int i) {
+  this->enemyBullet.setSize(enemyBulletSize);
+  this->enemyBullet.setPosition(sf::Vector2f(this->enemies[i].getPosition().x,this->enemies[i].getPosition().y + this->enemyBulletSize.y));
+  this->enemyBullet.setOrigin(enemyBulletOrigin);
+  this->enemyBullet.setFillColor(sf::Color::Red);
+}
+
+void Game::attackEnemy() {
+  if (this->enemyClock.getElapsedTime().asMilliseconds() >= this->gameSpeed.asMilliseconds()) {
+    this->initEnemyAttack(rand() % enemies.size());
+    this->enemyBullets.push_back(this->enemyBullet);
+    enemyClock.restart();
+  }
+}
+
+void Game::moveEnemyBullet() {
+  for (auto& e: this->enemyBullets) {
+    e.move(-(this->bulletSpeed));
   }
 }
 
@@ -235,23 +281,32 @@ void Game::spawnEnemy() {
     this->enemyPos.y = this->enemyPos.y + 125.f;
   }
 }
-
 //Accessors
 bool Game::getWindowIsOpen() const {
   return this->window_->isOpen();
 }
 
-void Game::playerInput() {
-    //Movement
+void Game::gameStage() {
+  if (this->globalClock.getElapsedTime().asSeconds() >= this->gameSpeedUp.asSeconds()) {
+    //Speeds up enemies
+    this->moveIntervalEnemy -= sf::milliseconds(this->moveIntervalEnemyStep);
+    this->gameSpeed -= sf::milliseconds(this->gameSpeedStep);
+    this->gameSpeedUp -= sf::seconds(this->gameSpeedUpStep);
+    this->globalClock.restart();
+  }
+}
 
+void Game::playerInput() {
+  //Movement
   if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) {
     this->player.move(sf::Vector2f(-XVEL,0.0f));
   } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) {
     this->player.move(sf::Vector2f(XVEL,0.0f));
   }
-  if ( sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space) && !onKeyPressed) {
+  if ( sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space) && !onKeyPressed && bulletExist) {
     this->shoot();
     this->onKeyPressed = true;
+    this->bulletExist = false;
   } else if (!(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))) {
     this->onKeyPressed = false;
   }
@@ -263,7 +318,6 @@ void Game::playerInput() {
 }
 
 void Game::pollEvents() {
-
   while ((event_ = this->window_->pollEvent())) {
 
     if (this->event_->is<sf::Event::Closed>()) {
@@ -281,22 +335,23 @@ Game::~Game() {
 }
 
 //Constructor destructor
-Game::Game() : stepsToSpeedupOld(ENEMYSPEEDUP) {
+Game::Game() {
   this->initVar();
   this->initWindow();
   this->initPlayer();
   this->initEnemy(enemyPos);
   this->updateEnemies();
-  this->initObstacles(obsInitPos);
-  this->initBullet();
   this->spawnObstacle();
-  //this->initObstacles(this->obsInitPos);
 }
 
 void Game::update() {
+  this->gameStage();
   this->pollEvents();
   this->playerInput();
   this->moveEnemies();
+  this->attackEnemy();
+  this->moveEnemyBullet();
+  this->enemyCollisionDetection();
   this->moveBullet();
   this->collisionDetect();
 }
@@ -305,7 +360,7 @@ void Game::updateEnemies() {
   this->spawnEnemy();
 }
 
-void Game::renderPlayer() {
+void Game::renderPlayer() const {
   this->window_->draw(this->player);
 }
 
@@ -315,15 +370,21 @@ void Game::renderEnemies() {
   }
 }
 
+void Game::renderEnemyBullet() {
+  for (auto tzname1: this->enemyBullets) {
+    this->window_->draw(tzname1);
+  }
+}
+
 void Game::render() {
   /*
       Renders game Object
   */
   this->window_->clear();
 
-
   this->renderPlayer();
   this->bulletRender();
+  this->renderEnemyBullet();
   this->renderEnemies();
   this->renderObstacles();
 

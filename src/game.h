@@ -3,6 +3,7 @@
 
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
+#include <ctime>
 #include <iostream>
 #include <vector>
 
@@ -14,6 +15,7 @@
 
 #define WINDOWW 0
 #define WINDOWH 1
+
 /*
  * Class that acts as Game Engine.
  * Wrapper Class.
@@ -22,16 +24,24 @@ class Game {
 private:
   //Variables
   //Window
-  sf::RenderWindow* window_;
+  sf::RenderWindow * window_;
   sf::VideoMode videoMode_;
   int windowSize[2];
   //Event
   std::optional<sf::Event> event_;
   //Game Logic
+  sf::Clock globalClock;
+  sf::Time gameSpeed;
+  sf::Clock enemyClock;
+  sf::Time gameSpeedUp;
   sf::Clock clock;
   sf::Time moveIntervalEnemy;
   int8_t enemyMoveCounter;
   int8_t enemySteps;
+  float moveIntervalEnemyStep;
+  float gameSpeedStep;
+  float gameSpeedUpStep;
+
   //Game Objects
   //Player
   sf::RectangleShape player;
@@ -40,12 +50,12 @@ private:
   sf::Vector2f playerPos;
   bool onKeyPressed;
 
-  t sf::RectangleShape bullet;
+  std::unique_ptr<sf::RectangleShape> bullet;
   sf::Vector2f bulletPos;
   sf::Vector2f bulletSize;
   sf::Vector2f bulletOrigin;
   sf::Vector2f bulletSpeed;
-  std::vector<sf::RectangleShape> bullets;
+  bool bulletExist;
   //Enemies
   std::vector<sf::RectangleShape> enemies;
   sf::RectangleShape enemy;
@@ -55,9 +65,13 @@ private:
   uint8_t numberEnemies;
   int8_t dir; //move direction
   int8_t dirCheck;
-  int8_t stepsToSpeedup;
-  const int8_t stepsToSpeedupOld;
   float enemySpeedUp;
+
+  std::vector<sf::RectangleShape> enemyBullets;
+  sf::RectangleShape enemyBullet;
+  sf::Vector2f enemyBulletPos;
+  sf::Vector2f enemyBulletSize;
+  sf::Vector2f enemyBulletOrigin;
 
   //Obstacles
   sf::RectangleShape obs;
@@ -81,16 +95,22 @@ public:
   //Accessors
   bool getWindowIsOpen() const;
   //Functions
+  void gameStage();
+
   void playerInput();
   void initPlayer();
   void initBullet();
   void shoot();
-  void bulletRender();
-  void moveBullet();
+  void bulletRender() const;
+  void moveBullet() const;
 
   void spawnEnemy();
   void initEnemy(sf::Vector2f enemyPos);
   void moveEnemies();
+  void initEnemyAttack(int i);
+  void attackEnemy();
+  void moveEnemyBullet();
+  void enemyCollisionDetection();
 
   auto initObstacles(sf::Vector2f obsPos) -> void;
   void spawnObstacle();
@@ -101,8 +121,9 @@ public:
   void pollEvents();
   void update();
   void updateEnemies();
-  void renderPlayer();
+  void renderPlayer() const;
   void renderEnemies();
+  void renderEnemyBullet();
   void render();
 };
 
